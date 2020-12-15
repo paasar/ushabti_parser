@@ -1,7 +1,8 @@
 extern crate image;
 
-use image::{GenericImageView, ImageBuffer, Rgb};
 use std::cmp::{max, min};
+
+use image::{GenericImageView, ImageBuffer, Rgb};
 
 const RED: [u8;3] = [255, 0, 0];
 const GREEN: [u8;3] = [0, 255, 0];
@@ -167,8 +168,12 @@ fn main() {
         }
     }
 
-    // TODO extract into function
-    // Draw rect around found ushabtis
+    draw_bounding_box_around_ushabtis(&mut result_img_buf, found_ushabtis);
+
+    result_img_buf.save("output.png").unwrap();
+}
+
+fn draw_bounding_box_around_ushabtis(result_img_buf: &mut ImageBuffer<Rgb<u8>, Vec<u8>>, found_ushabtis: Vec<[u32; 4]>) {
     for [x1, y1, x2, y2] in found_ushabtis {
         for xd in x1..x2 {
             let pix = result_img_buf.get_pixel_mut(xd, y1);
@@ -183,6 +188,4 @@ fn main() {
             *pix = image::Rgb(WHITE);
         }
     }
-
-    result_img_buf.save("output.png").unwrap();
 }
