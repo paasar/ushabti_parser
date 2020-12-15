@@ -17,8 +17,8 @@ const PIXEL_SURROUND_AREA: u32 = PIXEL_SURROUND_RANGE * PIXEL_SURROUND_RANGE;
 fn main() {
     println!("Doing some image magic!");
 
-    let img = image::open("ushabti_1.jpeg").unwrap();
-    // let img = image::open("ushabti_1_small.jpg").unwrap();
+    // let img = image::open("ushabti_1.jpeg").unwrap();
+    let img = image::open("ushabti_1_small.jpg").unwrap();
     // let img = image::open("ushabti_1_tiny.png").unwrap();
 
     let dim= img.dimensions();
@@ -45,6 +45,7 @@ fn main() {
             if is_ushabti_pixel(x, y, width, height, &color_array) {
                 match resolve_shape(x, y, width, height, &color_array) {
                     Some(found_shape) => {
+                        // TODO if bounding boxes overlap, use bigger
                         found_ushabtis.push(found_shape);
                         println!("Ushabti at {:?}", found_shape);
                     },
