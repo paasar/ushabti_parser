@@ -3,12 +3,13 @@ extern crate image;
 use image::{GenericImageView, ImageBuffer, Rgb};
 use std::cmp::{max, min};
 
-// const RED: [u8;3] = [255, 0, 0];
-// const GREEN: [u8;3] = [0, 255, 0];
+const RED: [u8;3] = [255, 0, 0];
+const GREEN: [u8;3] = [0, 255, 0];
 const WHITE: [u8;3] = [255, 255, 255];
 //TODO Other ushabti colors
 const GREEN_SCALE: ([u8;3], [u8;3]) = ([0, 80, 0], [120, 255, 120]);
-const STEP: u32 = 10;
+const SEEK_STEP: u32 = 60;
+const DEFINITION_STEP: u32 = 10;
 const PIXEL_SURROUND_RANGE: u32 = 10;
 const PIXEL_SURROUND_AREA: u32 = PIXEL_SURROUND_RANGE * PIXEL_SURROUND_RANGE;
 
@@ -72,26 +73,26 @@ fn resolve_shape(start_x: u32, start_y: u32, width: u32, height: u32, color_arra
 
     // Find right edge
     while (cur_x < width && is_ushabti_pixel(cur_x, cur_y, width, height, color_array)) ||
-          (cur_x + STEP < width && is_ushabti_pixel(cur_x + STEP, cur_y, width, height, color_array)) {
+          (cur_x + DEFINITION_STEP < width && is_ushabti_pixel(cur_x + DEFINITION_STEP, cur_y, width, height, color_array)) {
         bottom_right_x = cur_x;
-        cur_x += STEP;
+        cur_x += DEFINITION_STEP;
     }
 
     // Move to middle x and find min and max y.
     let half_x = (bottom_right_x - top_left_x) / 2;
     cur_x = top_left_x + half_x;
     while (cur_y > 0 && is_ushabti_pixel(cur_x, cur_y, width, height, color_array)) ||
-        (cur_y > 0 + STEP && is_ushabti_pixel(cur_x, cur_y - STEP, width, height, color_array)) {
+        (cur_y > 0 + DEFINITION_STEP && is_ushabti_pixel(cur_x, cur_y - DEFINITION_STEP, width, height, color_array)) {
         top_left_y = cur_y;
-        cur_y -= STEP;
+        cur_y -= DEFINITION_STEP;
 
     }
 
     cur_y = start_y;
     while (cur_y < height && is_ushabti_pixel(cur_x, cur_y, width, height, color_array)) ||
-          (cur_y + STEP < height && is_ushabti_pixel(cur_x, cur_y + STEP, width, height, color_array)) {
+          (cur_y + DEFINITION_STEP < height && is_ushabti_pixel(cur_x, cur_y + DEFINITION_STEP, width, height, color_array)) {
         bottom_right_y = cur_y;
-        cur_y += STEP;
+        cur_y += DEFINITION_STEP;
     }
 
     // Move to middle y and find min and max x.
@@ -99,17 +100,17 @@ fn resolve_shape(start_x: u32, start_y: u32, width: u32, height: u32, color_arra
     cur_y = top_left_y + half_y;
     cur_x = start_x;
     while (cur_x > 0 && is_ushabti_pixel(cur_x, cur_y, width, height, color_array)) ||
-        (cur_x > 0 + STEP && is_ushabti_pixel(cur_x - STEP, cur_y, width, height, color_array)) {
+        (cur_x > 0 + DEFINITION_STEP && is_ushabti_pixel(cur_x - DEFINITION_STEP, cur_y, width, height, color_array)) {
         top_left_x = cur_x;
-        cur_x -= STEP;
+        cur_x -= DEFINITION_STEP;
 
     }
 
     cur_x = start_x;
     while (cur_x < width && is_ushabti_pixel(cur_x, cur_y, width, height, color_array)) ||
-        (cur_y + STEP < width && is_ushabti_pixel(cur_x + STEP, cur_y, width, height, color_array)) {
+        (cur_y + DEFINITION_STEP < width && is_ushabti_pixel(cur_x + DEFINITION_STEP, cur_y, width, height, color_array)) {
         bottom_right_x = cur_x;
-        cur_x += STEP;
+        cur_x += DEFINITION_STEP;
     }
 
     if is_big_enough(top_left_x, top_left_y, bottom_right_x, bottom_right_y) {
@@ -122,9 +123,9 @@ fn resolve_shape(start_x: u32, start_y: u32, width: u32, height: u32, color_arra
 fn main() {
     println!("Doing some image magic!");
 
-    // let img = image::open("ushabti_1_tiny.png").unwrap();
     let img = image::open("ushabti_1.jpeg").unwrap();
     // let img = image::open("ushabti_1_small.jpg").unwrap();
+    // let img = image::open("ushabti_1_tiny.png").unwrap();
 
     let dim= img.dimensions();
     let (width, height) = dim;
@@ -145,7 +146,7 @@ fn main() {
     let mut found_ushabtis: Vec<[u32; 4]> = Vec::new();
 
     for (x, y, pixel) in result_img_buf.enumerate_pixels_mut() {
-        if x % STEP == 0 && y % STEP == 0 && !point_in(x, y, &found_ushabtis) {
+        if x % SEEK_STEP == 0 && y % SEEK_STEP == 0 && !point_in(x, y, &found_ushabtis) {
 
             if is_ushabti_pixel(x, y, width, height, &color_array) {
                 match resolve_shape(x, y, width, height, &color_array) {
@@ -155,9 +156,9 @@ fn main() {
                     },
                     None => ()
                 }
-                // *pixel = image::Rgb(RED);
+                *pixel = image::Rgb(RED);
             } else {
-                // *pixel = image::Rgb(GREEN);
+                *pixel = image::Rgb(GREEN);
             }
 
         } else {
