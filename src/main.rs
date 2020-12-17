@@ -40,17 +40,10 @@ fn main() {
     let mut found_ushabtis: Vec<[u32; 4]> = Vec::new();
 
     for (x, y, pixel) in result_img_buf.enumerate_pixels_mut() {
-        if x % SEEK_STEP == 0 && y % SEEK_STEP == 0 && !point_in(x, y, &found_ushabtis) {
+        if x % SEEK_STEP == 0 && y % SEEK_STEP == 0 && !point_in_any_of(x, y, &found_ushabtis) {
 
             if is_ushabti_pixel(x, y, width, height, &color_array) {
-                match resolve_shape(x, y, width, height, &color_array) {
-                    Some(found_shape) => {
-                        // TODO if bounding boxes overlap, use bigger
-                        found_ushabtis.push(found_shape);
-                        println!("Ushabti at {:?}", found_shape);
-                    },
-                    None => ()
-                }
+                resolve_and_add_ushabti(x, y, width, height, &color_array, &mut found_ushabtis);
                 *pixel = image::Rgb(RED);
             } else {
                 *pixel = image::Rgb(GREEN);
@@ -67,7 +60,7 @@ fn main() {
     result_img_buf.save("output.png").unwrap();
 }
 
-fn point_in(x: u32, y: u32, area_vec: &Vec<[u32;4]>) -> bool {
+fn point_in_any_of(x: u32, y: u32, area_vec: &Vec<[u32;4]>) -> bool {
     let areas = area_vec.to_vec();
     for [x1, y1, x2, y2] in areas {
         if x1 <= x && x <= x2 &&
@@ -109,6 +102,27 @@ fn is_in_color_range(values: [u8;3], acceptable_range: ([u8;3], [u8;3])) -> bool
     return min_r < r && r < max_r &&
         min_g < g && g < max_g &&
         min_b < b && b < max_b;
+}
+
+fn resolve_and_add_ushabti(x: u32, y: u32, width: u32, height: u32, color_array: &Vec<Vec<[u8; 3]>>, found_ushabtis: &mut Vec<[u32; 4]>) {
+    match resolve_shape(x, y, width, height, &color_array) {
+        Some(found_shape) => {
+            match overlaps_with_any(found_shape, &found_ushabtis) {
+                Some((position, area_of_existing)) => {
+                    if area_of_existing < area(found_shape) {
+                        found_ushabtis.remove(position);
+                        found_ushabtis.push(found_shape);
+                        println!("Bigger than previous ushabti at {:?}", found_shape);
+                    }
+                },
+                None => {
+                    found_ushabtis.push(found_shape);
+                    println!("Ushabti at {:?}", found_shape);
+                }
+            }
+        },
+        None => ()
+    }
 }
 
 fn resolve_shape(start_x: u32, start_y: u32, width: u32, height: u32, color_array: &Vec<Vec<[u8; 3]>>) -> Option<[u32; 4]> {
@@ -171,7 +185,31 @@ fn resolve_shape(start_x: u32, start_y: u32, width: u32, height: u32, color_arra
 
 fn is_big_enough(top_left_x: u32, top_left_y: u32, bottom_right_x: u32, bottom_right_y: u32) -> bool {
     return bottom_right_x - top_left_x > 80 &&
-        bottom_right_y - top_left_y > 120;
+        bottom_right_y - top_left_y > 140;
+}
+
+fn overlaps_with_any(rect: [u32; 4], found_ushabtis: &Vec<[u32; 4]>) -> Option<(usize, u32)> {
+    for (position, ushabti) in found_ushabtis.iter().enumerate() {
+        if overlaps(rect, *ushabti) {
+            return Some((position, area(*ushabti)));
+        }
+    }
+
+    return None;
+}
+
+fn overlaps(rect_a: [u32; 4], rect_b: [u32; 4]) -> bool {
+    let [a_x1, a_y1, a_x2, a_y2] = rect_a;
+    let [b_x1, b_y1, b_x2, b_y2] = rect_b;
+
+    return !(a_x2 < b_x1 || a_x1 > b_x2 || a_y2 < b_y1 || a_y1 > b_y2)
+}
+
+fn area(rect: [u32; 4]) -> u32 {
+    let [x1, y1, x2, y2] = rect;
+
+    // Theoretical possibility to go over u32
+    return (x2 - x1) * (y2 - y1);
 }
 
 fn draw_bounding_box_around_ushabtis(result_img_buf: &mut ImageBuffer<Rgb<u8>, Vec<u8>>, found_ushabtis: Vec<[u32; 4]>) {
