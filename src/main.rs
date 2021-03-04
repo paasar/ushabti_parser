@@ -7,6 +7,7 @@ use image::{GenericImageView, ImageBuffer, Rgb};
 const RED: [u8;3] = [255, 0, 0];
 const GREEN: [u8;3] = [0, 255, 0];
 const WHITE: [u8;3] = [255, 255, 255];
+const BLACK: [u8;3] = [0, 0, 0];
 //TODO Other ushabti colors
 const GREEN_SCALE: ([u8;3], [u8;3]) = ([0, 80, 0], [120, 255, 120]);
 const SEEK_STEP: u32 = 60;
@@ -17,8 +18,8 @@ const PIXEL_SURROUND_AREA: u32 = PIXEL_SURROUND_RANGE * PIXEL_SURROUND_RANGE;
 fn main() {
     println!("Doing some image magic!");
 
-    // let img = image::open("ushabti_1.jpeg").unwrap();
-    let img = image::open("ushabti_1_small.jpg").unwrap();
+    let img = image::open("ushabti_2_small.jpg").unwrap();
+    // let img = image::open("ushabti_1_small.jpg").unwrap();
     // let img = image::open("ushabti_1_tiny.png").unwrap();
 
     let dim= img.dimensions();
@@ -55,9 +56,37 @@ fn main() {
         }
     }
 
-    draw_bounding_box_around_ushabtis(&mut result_img_buf, found_ushabtis);
+    draw_bounding_box_around_ushabtis(&found_ushabtis, &mut result_img_buf);
+    draw_symbol_into_separate_image(&found_ushabtis, color_array);
 
     result_img_buf.save("output.png").unwrap();
+}
+
+fn draw_symbol_into_separate_image(found_ushabtis: &Vec<[u32; 4]>, color_array: Vec<Vec<[u8; 3]>>) {
+    let mut count = 1;
+    for [x1, _, x2, y2] in found_ushabtis.to_vec() {
+        // TODO Change magic numbers into descriptive and different symbols containing rectangle variable
+        // TODO Different magic numbers for small ushabti
+        let sx1 = x1 + 30;
+        let sx2 = x2 - 30;
+        let sy1 = y2 - 70;
+        let sy2 = y2 - 30;
+
+        let mut symbol_image_buf: ImageBuffer<Rgb<u8>, Vec<u8>> = image::ImageBuffer::new(sx2 - sx1, sy2 - sy1);
+        // copy pixels
+        for (x, y, pix) in symbol_image_buf.enumerate_pixels_mut() {
+            let [r, g, b] = color_array[(sx1 + x) as usize][(sy1 + y) as usize];
+                if ((r as f32 + g as f32 + b as f32) / 3 as f32) > 80 as f32 {
+                    *pix = image::Rgb(BLACK);
+                } else {
+                    *pix = image::Rgb(WHITE);
+                }
+        }
+
+        // separate name for each ushabti
+        symbol_image_buf.save(format!("output_symbol_{}.png", count)).unwrap();
+        count += 1;
+    }
 }
 
 fn point_in_any_of(x: u32, y: u32, area_vec: &Vec<[u32;4]>) -> bool {
@@ -212,8 +241,8 @@ fn area(rect: [u32; 4]) -> u32 {
     return (x2 - x1) * (y2 - y1);
 }
 
-fn draw_bounding_box_around_ushabtis(result_img_buf: &mut ImageBuffer<Rgb<u8>, Vec<u8>>, found_ushabtis: Vec<[u32; 4]>) {
-    for [x1, y1, x2, y2] in found_ushabtis {
+fn draw_bounding_box_around_ushabtis(found_ushabtis: &Vec<[u32; 4]>, result_img_buf: &mut ImageBuffer<Rgb<u8>, Vec<u8>>) {
+    for [x1, y1, x2, y2] in found_ushabtis.to_vec() {
         for xd in x1..x2 {
             let pix = result_img_buf.get_pixel_mut(xd, y1);
             *pix = image::Rgb(WHITE);
