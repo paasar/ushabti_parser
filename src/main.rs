@@ -7,6 +7,7 @@ use image::{GenericImageView, ImageBuffer, Rgb};
 const RED: [u8;3] = [255, 0, 0];
 const GREEN: [u8;3] = [0, 255, 0];
 const WHITE: [u8;3] = [255, 255, 255];
+const BLACK: [u8;3] = [0, 0, 0];
 //TODO Other ushabti colors
 const GREEN_SCALE: ([u8;3], [u8;3]) = ([0, 80, 0], [120, 255, 120]);
 const SEEK_STEP: u32 = 60;
@@ -17,9 +18,8 @@ const PIXEL_SURROUND_AREA: u32 = PIXEL_SURROUND_RANGE * PIXEL_SURROUND_RANGE;
 fn main() {
     println!("Doing some image magic!");
 
-    // let img = image::open("ushabti_1.jpeg").unwrap();
-    let img = image::open("ushabti_1_small.jpg").unwrap();
-    // let img = image::open("ushabti_1_tiny.png").unwrap();
+    // let img = image::open("ushabti_4_small.png").unwrap();
+    let img = image::open("images/ushabti_1_small.jpg").unwrap();
 
     let dim= img.dimensions();
     let (width, height) = dim;
@@ -55,9 +55,112 @@ fn main() {
         }
     }
 
-    draw_bounding_box_around_ushabtis(&mut result_img_buf, found_ushabtis);
+    draw_bounding_box_around_ushabtis(&found_ushabtis, &mut result_img_buf);
+    try_to_recognize_each_symbol(&found_ushabtis, color_array);
 
     result_img_buf.save("output.png").unwrap();
+}
+
+fn is_groove_dark_pixel([r, g, b]: [u8; 3]) -> bool {
+    return ((r as f32 + g as f32 + b as f32) / 3 as f32) < 80 as f32;
+}
+
+fn symbol_bottom_adjustment(y_top: u32, y_bottom: u32) -> u32 {
+    if y_bottom - y_top > 180 {
+        // A big ushabti has the symbol a bit higher
+        return 14;
+    } else {
+        return 0;
+    }
+}
+
+fn try_to_recognize_each_symbol(found_ushabtis: &Vec<[u32; 4]>, color_array: Vec<Vec<[u8; 3]>>) {
+    let symbol_ankh = image::open("symbol_ankh.png").unwrap();
+    let symbol_bat = image::open("symbol_bat.png").unwrap();
+    let symbol_eye = image::open("symbol_eye.png").unwrap();
+    let symbol_snake = image::open("symbol_snake.png").unwrap();
+    let symbol_vortex = image::open("symbol_vortex.png").unwrap();
+
+    let mut count = 1;
+    for [x1, y1, x2, y2] in found_ushabtis.to_vec() {
+        let ushabi_edge_to_symbol_edge = 30;
+        let symbol_left = x1 + ushabi_edge_to_symbol_edge;
+        let symbol_right = x2 - ushabi_edge_to_symbol_edge;
+        let symbol_height = 30;
+        let from_bottom_to_symbol_bottom = 20;
+        let symbol_bottom = y2 - from_bottom_to_symbol_bottom - symbol_bottom_adjustment(y1, y2);
+        let symbol_top = symbol_bottom - symbol_height;
+
+        println!("Found a symbol at {:?}, {:?}, {:?}, {:?}", symbol_left, symbol_top, symbol_right, symbol_bottom);
+
+        let mut symbol_image_buf: ImageBuffer<Rgb<u8>, Vec<u8>> = image::ImageBuffer::new(symbol_right - symbol_left, symbol_height);
+        // copy pixels
+        for (x, y, pix) in symbol_image_buf.enumerate_pixels_mut() {
+            let color = color_array[(symbol_left + x) as usize][(symbol_top + y) as usize];
+            if is_groove_dark_pixel(color) {
+                *pix = image::Rgb(WHITE);
+            } else {
+                *pix = image::Rgb(BLACK);
+            }
+        }
+
+        let total_pixels = symbol_image_buf.width() * symbol_image_buf.height();
+        let mut ankh_match = 0;
+        let mut bat_match = 0;
+        let mut eye_match = 0;
+        let mut snake_match = 0;
+        let mut vortex_match = 0;
+
+        // TODO This can panic if the symbol dimensions are different for any reason
+        for (x, y, pix) in symbol_image_buf.enumerate_pixels() {
+            let image::Rgba([ankh_r, _, _, _]) = symbol_ankh.get_pixel(x, y);
+            let image::Rgba([bat_r, _, _, _]) = symbol_bat.get_pixel(x, y);
+            let image::Rgba([eye_r, _, _, _]) = symbol_eye.get_pixel(x, y);
+            let image::Rgba([snake_r, _, _, _]) = symbol_snake.get_pixel(x, y);
+            let image::Rgba([vortex_r, _, _, _]) = symbol_vortex.get_pixel(x, y);
+            let image::Rgb([symbol_r, _, _]) = pix;
+
+            if ankh_r == *symbol_r {
+                ankh_match += 1;
+            }
+
+            if bat_r == *symbol_r {
+                bat_match += 1;
+            }
+
+            if eye_r == *symbol_r {
+                eye_match += 1;
+            }
+
+            if snake_r == *symbol_r {
+                snake_match += 1;
+            }
+
+            if vortex_r == *symbol_r {
+                vortex_match += 1;
+            }
+        }
+
+        let ankh_similarity = ((ankh_match as f32 / total_pixels as f32) * 100 as f32, "Ankh");
+        // println!("Ankh similarity {:?} %.", ankh_similarity.0);
+        let bat_similarity = ((bat_match as f32 / total_pixels as f32) * 100 as f32, "Bat");
+        // println!("Bat similarity {:?} %.", bat_similarity.0);
+        let eye_similarity = ((eye_match as f32 / total_pixels as f32) * 100 as f32, "Eye");
+        // println!("Eye similarity {:?} %.", eye_similarity.0);
+        let snake_similarity = ((snake_match as f32 / total_pixels as f32) * 100 as f32, "Snake");
+        // println!("Snake similarity {:?} %.", snake_similarity.0);
+        let vortex_similarity = ((vortex_match as f32 / total_pixels as f32) * 100 as f32, "Vortex");
+        // println!("Vortex similarity {:?} %.", vortex_similarity.0);
+
+        let mut similarities = [ankh_similarity, bat_similarity, eye_similarity, snake_similarity, vortex_similarity];
+        similarities.sort_by(|(sim1, _), (sim2, _) | sim2.partial_cmp(sim1).unwrap());
+
+        println!("Symbol (probably) is: {:?}", similarities[0].1);
+
+        // separate name for each symbol
+        symbol_image_buf.save(format!("output_symbol_{}.png", count)).unwrap();
+        count += 1;
+    }
 }
 
 fn point_in_any_of(x: u32, y: u32, area_vec: &Vec<[u32;4]>) -> bool {
@@ -142,8 +245,7 @@ fn resolve_shape(start_x: u32, start_y: u32, width: u32, height: u32, color_arra
     }
 
     // Move to middle x and find min and max y.
-    let half_x = (bottom_right_x - top_left_x) / 2;
-    cur_x = top_left_x + half_x;
+    cur_x = (bottom_right_x + top_left_x) / 2;
     while (cur_y > 0 && is_ushabti_pixel(cur_x, cur_y, width, height, color_array)) ||
         (cur_y > 0 + DEFINITION_STEP && is_ushabti_pixel(cur_x, cur_y - DEFINITION_STEP, width, height, color_array)) {
         top_left_y = cur_y;
@@ -159,8 +261,7 @@ fn resolve_shape(start_x: u32, start_y: u32, width: u32, height: u32, color_arra
     }
 
     // Move to middle y and find min and max x.
-    let half_y = (bottom_right_y - top_left_y) / 2;
-    cur_y = top_left_y + half_y;
+    cur_y = (bottom_right_y + top_left_y) / 2;
     cur_x = start_x;
     while (cur_x > 0 && is_ushabti_pixel(cur_x, cur_y, width, height, color_array)) ||
         (cur_x > 0 + DEFINITION_STEP && is_ushabti_pixel(cur_x - DEFINITION_STEP, cur_y, width, height, color_array)) {
@@ -212,8 +313,8 @@ fn area(rect: [u32; 4]) -> u32 {
     return (x2 - x1) * (y2 - y1);
 }
 
-fn draw_bounding_box_around_ushabtis(result_img_buf: &mut ImageBuffer<Rgb<u8>, Vec<u8>>, found_ushabtis: Vec<[u32; 4]>) {
-    for [x1, y1, x2, y2] in found_ushabtis {
+fn draw_bounding_box_around_ushabtis(found_ushabtis: &Vec<[u32; 4]>, result_img_buf: &mut ImageBuffer<Rgb<u8>, Vec<u8>>) {
+    for [x1, y1, x2, y2] in found_ushabtis.to_vec() {
         for xd in x1..x2 {
             let pix = result_img_buf.get_pixel_mut(xd, y1);
             *pix = image::Rgb(WHITE);
