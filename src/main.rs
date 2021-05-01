@@ -142,8 +142,7 @@ fn resolve_shape(start_x: u32, start_y: u32, width: u32, height: u32, color_arra
     }
 
     // Move to middle x and find min and max y.
-    let half_x = (bottom_right_x - top_left_x) / 2;
-    cur_x = top_left_x + half_x;
+    cur_x = (bottom_right_x + top_left_x) / 2;
     while (cur_y > 0 && is_ushabti_pixel(cur_x, cur_y, width, height, color_array)) ||
         (cur_y > 0 + DEFINITION_STEP && is_ushabti_pixel(cur_x, cur_y - DEFINITION_STEP, width, height, color_array)) {
         top_left_y = cur_y;
@@ -159,8 +158,7 @@ fn resolve_shape(start_x: u32, start_y: u32, width: u32, height: u32, color_arra
     }
 
     // Move to middle y and find min and max x.
-    let half_y = (bottom_right_y - top_left_y) / 2;
-    cur_y = top_left_y + half_y;
+    cur_y = (bottom_right_y + top_left_y) / 2;
     cur_x = start_x;
     while (cur_x > 0 && is_ushabti_pixel(cur_x, cur_y, width, height, color_array)) ||
         (cur_x > 0 + DEFINITION_STEP && is_ushabti_pixel(cur_x - DEFINITION_STEP, cur_y, width, height, color_array)) {
